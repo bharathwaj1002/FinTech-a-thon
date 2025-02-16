@@ -1,111 +1,113 @@
-import React, { useState } from 'react';
-import { Shield, AlertTriangle, CheckCircle2, Send, History, User, Lock, Flag, AlertCircle, X, ArrowRight } from 'lucide-react';
+import React, { useState } from "react";
+import {
+  Shield,
+  AlertTriangle,
+  CheckCircle2,
+  Send,
+  History,
+  User,
+  Lock,
+  Flag,
+  AlertCircle,
+  X,
+  ArrowRight,
+} from "lucide-react";
+import axios from "axios";
 
 interface Transaction {
   id: string;
   amount: number;
   to: string;
   timestamp: Date;
-  status: 'success' | 'flagged' | 'blocked';
-}
-
-interface SuspiciousUPI {
-  id: string;
-  reportCount: number;
-  maxLimit: number;
+  status: "success" | "flagged" | "blocked";
 }
 
 function App() {
-  const [amount, setAmount] = useState('');
-  const [upiId, setUpiId] = useState('');
+  const [amount, setAmount] = useState("");
+  const [upiId, setUpiId] = useState("");
   const [showAlert, setShowAlert] = useState(false);
-  const [alertType, setAlertType] = useState<'amount' | 'suspicious' | null>(null);
+  const [alertType, setAlertType] = useState<"amount" | "suspicious" | null>(
+    null
+  );
   const [showReportModal, setShowReportModal] = useState(false);
-
-  // Simulated suspicious UPI database
-  const suspiciousUpis: SuspiciousUPI[] = [
-    { id: 'scammer@upi', reportCount: 15, maxLimit: 1000 },
-    { id: 'unknown@suspicious', reportCount: 8, maxLimit: 2000 },
-    { id: 'fake@payment', reportCount: 25, maxLimit: 500 }
-  ];
 
   const [transactions] = useState<Transaction[]>([
     {
-      id: '1',
+      id: "1",
       amount: 1000,
-      to: 'merchant@upi',
+      to: "merchant@bank",
       timestamp: new Date(),
-      status: 'success'
+      status: "success",
     },
     {
-      id: '2',
+      id: "2",
       amount: 50000,
-      to: 'unknown@suspicious',
+      to: "unknown@suspicious",
       timestamp: new Date(Date.now() - 3600000),
-      status: 'blocked'
+      status: "blocked",
     },
     {
-      id: '3',
+      id: "3",
       amount: 25000,
-      to: 'newuser@upi',
+      to: "newuser@bank",
       timestamp: new Date(Date.now() - 7200000),
-      status: 'flagged'
-    }
+      status: "flagged",
+    },
   ]);
 
-  const checkSuspiciousUPI = (upiId: string): SuspiciousUPI | undefined => {
-    return suspiciousUpis.find(upi => upi.id === upiId);
-  };
-
-  const handleTransaction = (e: React.FormEvent) => {
+  const handleTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const amountNum = parseFloat(amount);
-    const suspiciousUpi = checkSuspiciousUPI(upiId);
 
-    if (suspiciousUpi) {
-      setAlertType('suspicious');
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/check-suspicious-upi",
+        { upiId }
+      );
+      if (response.data.isSuspicious) {
+        if (amountNum > 10000) {
+          setAlertType("amount");
+          setShowAlert(true);
+          return;
+        } else {
+          setAlertType("suspicious");
+          setShowAlert(true);
+        }
+      } else {
+        proceedWithTransaction();
+      }
+    } catch (error) {
+      console.error("Error verifying UPI ID:", error);
+      setAlertType("suspicious");
       setShowAlert(true);
-      return;
-    } else if (amountNum > 10000) {
-      setAlertType('amount');
-      setShowAlert(true);
-      return;
     }
-
-    proceedWithTransaction();
   };
 
   const proceedWithTransaction = () => {
     // In a real app, this would process the transaction
-    alert('Transaction successful!');
-    setAmount('');
-    setUpiId('');
+    alert("Transaction successful!");
+    setAmount("");
+    setUpiId("");
     setShowAlert(false);
   };
 
   const handleReport = () => {
     setShowReportModal(false);
     // In a real app, this would update the database
-    alert('Thank you for reporting this UPI ID. Our team will investigate.');
+    alert("Thank you for reporting this UPI ID. Our team will investigate.");
   };
 
   const renderAlertContent = () => {
-    const suspiciousUpi = checkSuspiciousUPI(upiId);
-    const amountNum = parseFloat(amount);
-
-    if (alertType === 'suspicious') {
-      const isWithinLimit = suspiciousUpi && amountNum <= suspiciousUpi.maxLimit;
-      
+    if (alertType === "suspicious") {
       return (
         <div className="space-y-1">
-          <p className="font-semibold text-red-700">⚠️ High-Risk UPI ID Detected!</p>
-          <p>This UPI ID has been reported {suspiciousUpi?.reportCount} times!</p>
-          <p>Maximum safe transaction limit: ₹{suspiciousUpi?.maxLimit.toLocaleString()}</p>
+          <p className="font-semibold text-red-700">
+            ⚠️ High-Risk UPI ID Detected!
+          </p>
+          <p>This UPI ID has been reported multiple times!</p>
           <p className="text-sm text-red-600">
-            {isWithinLimit 
-              ? "Amount is within limit, but please verify the recipient carefully before proceeding."
-              : "Amount exceeds safe limit for this UPI ID. Transaction cannot proceed."}
+            Please verify the recipient carefully before proceeding.
           </p>
         </div>
       );
@@ -114,9 +116,7 @@ function App() {
   };
 
   const canProceed = () => {
-    const suspiciousUpi = checkSuspiciousUPI(upiId);
-    const amountNum = parseFloat(amount);
-    return alertType === 'suspicious' && suspiciousUpi && amountNum <= suspiciousUpi.maxLimit;
+    return alertType === "suspicious";
   };
 
   return (
@@ -126,7 +126,9 @@ function App() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Shield className="h-8 w-8 text-indigo-600" />
-              <span className="ml-2 text-xl font-semibold text-gray-800">SecureUPI</span>
+              <span className="ml-2 text-xl font-semibold text-gray-800">
+                SecureUPI
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <User className="h-6 w-6 text-gray-600" />
@@ -138,15 +140,19 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {showAlert && (
-          <div className={`mb-4 p-4 ${alertType === 'suspicious' ? 'bg-red-100 border-red-500' : 'bg-yellow-100 border-yellow-500'} border-l-4 text-gray-700 flex items-center justify-between animate-bounce`}>
+          <div
+            className={`mb-4 p-4 ${
+              alertType === "suspicious"
+                ? "bg-red-100 border-red-500"
+                : "bg-yellow-100 border-yellow-500"
+            } border-l-4 text-gray-700 flex items-center justify-between animate-bounce`}
+          >
             <div className="flex items-center flex-grow">
               <AlertTriangle className="h-6 w-6 mr-3 text-red-500 flex-shrink-0" />
-              <div className="flex-grow">
-                {renderAlertContent()}
-              </div>
+              <div className="flex-grow">{renderAlertContent()}</div>
             </div>
             <div className="flex items-center ml-4 space-x-3 flex-shrink-0">
-              {alertType === 'suspicious' && (
+              {alertType === "suspicious" && (
                 <>
                   <button
                     onClick={() => setShowReportModal(true)}
@@ -185,7 +191,8 @@ function App() {
                 Report Suspicious UPI ID
               </h3>
               <p className="mb-4 text-gray-600">
-                Are you sure you want to report {upiId} as suspicious? This will help protect other users from potential fraud.
+                Are you sure you want to report {upiId} as suspicious? This will
+                help protect other users from potential fraud.
               </p>
               <div className="flex justify-end space-x-4">
                 <button
@@ -235,7 +242,7 @@ function App() {
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
                   className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="example@upi"
+                  placeholder="example@bank"
                   required
                 />
               </div>
@@ -258,19 +265,21 @@ function App() {
                 <div key={tx.id} className="border-b pb-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold">₹{tx.amount.toLocaleString()}</p>
+                      <p className="font-semibold">
+                        ₹{tx.amount.toLocaleString()}
+                      </p>
                       <p className="text-sm text-gray-600">{tx.to}</p>
                       <p className="text-xs text-gray-500">
                         {tx.timestamp.toLocaleString()}
                       </p>
                     </div>
-                    {tx.status === 'success' && (
+                    {tx.status === "success" && (
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                     )}
-                    {tx.status === 'flagged' && (
+                    {tx.status === "flagged" && (
                       <AlertTriangle className="h-5 w-5 text-yellow-500" />
                     )}
-                    {tx.status === 'blocked' && (
+                    {tx.status === "blocked" && (
                       <Lock className="h-5 w-5 text-red-500" />
                     )}
                   </div>
@@ -281,22 +290,30 @@ function App() {
         </div>
 
         <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4">Fraud Prevention Features</h2>
+          <h2 className="text-2xl font-semibold mb-4">
+            Fraud Prevention Features
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-4 border rounded-lg">
               <Shield className="h-8 w-8 text-indigo-600 mb-2" />
               <h3 className="font-semibold mb-2">Transaction Monitoring</h3>
-              <p className="text-gray-600 text-sm">Real-time monitoring of all transactions for suspicious patterns</p>
+              <p className="text-gray-600 text-sm">
+                Real-time monitoring of all transactions for suspicious patterns
+              </p>
             </div>
             <div className="p-4 border rounded-lg">
               <AlertTriangle className="h-8 w-8 text-indigo-600 mb-2" />
               <h3 className="font-semibold mb-2">Amount Limits</h3>
-              <p className="text-gray-600 text-sm">Automatic flagging of high-value transactions</p>
+              <p className="text-gray-600 text-sm">
+                Automatic flagging of high-value transactions
+              </p>
             </div>
             <div className="p-4 border rounded-lg">
               <Lock className="h-8 w-8 text-indigo-600 mb-2" />
               <h3 className="font-semibold mb-2">Secure Authentication</h3>
-              <p className="text-gray-600 text-sm">Multi-factor authentication for all transactions</p>
+              <p className="text-gray-600 text-sm">
+                Multi-factor authentication for all transactions
+              </p>
             </div>
           </div>
         </div>
